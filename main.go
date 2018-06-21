@@ -15,7 +15,7 @@ func help() {
 Burrito collects ssm parameters and wraps them up... like a burrito!
 
 Collect your parameters by calling:
-        '$ burito env_var env_var1 env_var2
+        '$ Burrito env_var env_var1 env_var2
 
 Each env_var should be the SSM Parameter-Store key that you are setting. 
 Burrito will output burrito.sh which contains a shell script that will
@@ -69,10 +69,10 @@ func main() {
 
 	file_out := []byte(file_string)
 
-	err := ioutil.WriteFile("burito.sh", file_out, 0644)
+	err := ioutil.WriteFile("burrito.sh", file_out, 0644)
 
 	if err != nil {
-		fmt.Printf("Error: Could not write file burito.sh: %v", err)
+		fmt.Printf("Error: Could not write file burrito.sh: %v", err)
 		os.Exit(2)
 	}
 }
