@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,7 +25,7 @@ set the value of each variable to the returned SSM Parameter-Store value.
 `)
 }
 
-func get_parameter(parameter_name string) string {
+func get_parameter(parameter_name string) (string, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Config:            aws.Config{Region: aws.String("us-east-1")},
 		SharedConfigState: session.SharedConfigEnable,
@@ -44,32 +45,60 @@ func get_parameter(parameter_name string) string {
 	})
 	if err != nil {
 		fmt.Printf("Error: Could not find parameter: %v\n", err)
+		return "", err
 	}
 	value := *param.Parameter.Value
-	return value
+	return value, nil
 }
 
-func main() {
-	ssm_parameter_variables := os.Args[1:]
-	number_of_params := len(ssm_parameter_variables)
+type cli_options struct {
+	file_path   string
+	file_header string
+}
 
-	if number_of_params == 0 {
+func collect_cli_options() *cli_options {
+	cli_opt := cli_options{}
+	flag.StringVar(&cli_opt.file_path, "file_path", "burrito.sh", "This is the filepath for the output script, default is 'burrito.sh'")
+	flag.StringVar(&cli_opt.file_header, "file_header", "#!/bin/bash", "This is the fisrt line of the output script, defualt is '#!/bin/bash'")
+
+	return &cli_opt
+}
+
+func parameter_args() []string {
+	env_vars := flag.Args()
+
+	if len(env_vars) == 0 {
 		help()
 		fmt.Printf("Error: No parameters were passed in, please include some parameters\n\n")
 		os.Exit(1)
 	}
 
-	file_string := "#!/bin/bash\n\n"
+	return env_vars
+}
+
+func main() {
+	cli_opts := collect_cli_options()
+	flag.Parse()
+	ssm_parameter_variables := parameter_args()
+	number_of_params := len(ssm_parameter_variables)
+
+	file_string := cli_opts.file_header
 
 	for env_var := 0; env_var < number_of_params; env_var++ {
 		parameter_key := os.Getenv(ssm_parameter_variables[env_var])
-		parameter_value := get_parameter(parameter_key)
+		parameter_value, err := get_parameter(parameter_key)
+
+		if err != nil {
+			fmt.Printf("Skipped parameter: %v\n", ssm_parameter_variables[env_var])
+			continue
+		}
+
 		file_string = fmt.Sprintf("%vexport %v=%v\n", file_string, ssm_parameter_variables[env_var], parameter_value)
 	}
 
 	file_out := []byte(file_string)
 
-	err := ioutil.WriteFile("burrito.sh", file_out, 0644)
+	err := ioutil.WriteFile(cli_opts.file_path, file_out, 0644)
 
 	if err != nil {
 		fmt.Printf("Error: Could not write file burrito.sh: %v", err)
